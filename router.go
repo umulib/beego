@@ -658,6 +658,8 @@ func (p *ControllerRegister) execFilter(context *beecontext.Context, urlPath str
 
 // Implement http.Handler interface.
 func (p *ControllerRegister) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	var timeDur time.Duration
+	var statusCode int
 	startTime := time.Now()
 	var (
 		runRouter    reflect.Type
@@ -717,9 +719,10 @@ func (p *ControllerRegister) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 		var err error
 		context.Input.CruSession, err = GlobalSessions.SessionStart(rw, r)
 		if err != nil {
-			logs.Error(err)
-			exception("503", context)
-			goto Admin
+			//logs.Error(err)
+			//exception("503", context)
+			//goto Admin
+			goto NOTLOGIN
 		}
 		defer func() {
 			if context.Input.CruSession != nil {
@@ -885,14 +888,14 @@ func (p *ControllerRegister) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 Admin:
 	//admin module record QPS
 
-	statusCode := context.ResponseWriter.Status
+	statusCode = context.ResponseWriter.Status
 	if statusCode == 0 {
 		statusCode = 200
 	}
 
 	LogAccess(context, &startTime, statusCode)
 
-	timeDur := time.Since(startTime)
+	timeDur = time.Since(startTime)
 	context.ResponseWriter.Elapsed = timeDur
 	if BConfig.Listen.EnableAdmin {
 		pattern := ""
@@ -928,6 +931,21 @@ Admin:
 	if context.Output.Status != 0 {
 		context.ResponseWriter.WriteHeader(context.Output.Status)
 	}
+
+NOTLOGIN:
+	statusCode = context.ResponseWriter.Status
+	if statusCode == 0 {
+		statusCode = 200
+	}
+	logAccess(context, &startTime, statusCode)
+	timeDur = time.Since(startTime)
+	context.ResponseWriter.Elapsed = timeDur
+	data := map[string]interface{}{
+		"error_code":    100101,
+		"error_message": "need login",
+	}
+	context.Output.JSON(data, false, false)
+}
 }
 
 func (p *ControllerRegister) handleParamResponse(context *beecontext.Context, execController ControllerInterface, results []reflect.Value) {
