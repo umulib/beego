@@ -191,6 +191,10 @@ func (pder *MemProvider) SessionUpdate(sid string) error {
 	return nil
 }
 
-func init() {
-	Register("memory", mempder)
+func (pder *MemProvider) SessionToken(sid string) (string, error) {
+	return "", nil
 }
+
+//func init() {
+//	Register("memory", mempder)
+//}

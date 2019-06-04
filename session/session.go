@@ -61,6 +61,7 @@ type Provider interface {
 	SessionDestroy(sid string) error
 	SessionAll() int //get all active session
 	SessionGC()
+	SessionToken(token string) (string, error)
 }
 
 var provides = make(map[string]Provider)
@@ -176,26 +177,32 @@ func (manager *Manager) GetProvider() Provider {
 // sid is empty when need to generate a new session id
 // otherwise return an valid session id.
 func (manager *Manager) getSid(r *http.Request) (string, error) {
+	//commit by wenbo@umu.com
+	//第一步：从cookie中取
 	cookie, errs := r.Cookie(manager.config.CookieName)
 	if errs != nil || cookie.Value == "" {
 		var sid string
-		if manager.config.EnableSidInURLQuery {
-			errs := r.ParseForm()
-			if errs != nil {
-				return "", errs
-			}
-
-			sid = r.FormValue(manager.config.CookieName)
-		}
-
+		//第二步：从header中取
 		// if not found in Cookie / param, then read it from request headers
-		if manager.config.EnableSidInHTTPHeader && sid == "" {
+		if manager.config.EnableSidInHTTPHeader {
 			sids, isFound := r.Header[manager.config.SessionNameInHTTPHeader]
 			if isFound && len(sids) != 0 {
 				return sids[0], nil
 			}
 		}
 
+		if manager.config.EnableSidInURLQuery {
+			//第三步：从请求参数中取jsessid
+			errs := r.ParseForm()
+			if errs != nil {
+				return "", errs
+			}
+
+			sid = r.FormValue(manager.config.CookieName)
+			if sid != "" {
+				return sid, nil
+			}
+		}
 		return sid, nil
 	}
 
@@ -203,51 +210,65 @@ func (manager *Manager) getSid(r *http.Request) (string, error) {
 	return url.QueryUnescape(cookie.Value)
 }
 
+//commit by wenbo@umu.com
+func (manager *Manager) getLoginToken(r *http.Request) (loginToken string, err error) {
+	err = r.ParseForm()
+	if err != nil {
+		return
+	}
+
+	loginToken = r.FormValue("login_token")
+	return
+}
+
 // SessionStart generate or read the session id from http request.
 // if session id exists, return SessionStore with this id.
+// modify by wenbo@umu.com
 func (manager *Manager) SessionStart(w http.ResponseWriter, r *http.Request) (session Store, err error) {
 	sid, errs := manager.getSid(r)
 	if errs != nil {
 		return nil, errs
 	}
+	if sid == "" {
+		//第四步从请求参数获得login_token
+		loginToken, err := manager.getLoginToken(r)
+		if err != nil {
+			return nil, err
+		}
+		if loginToken != "" {
+			sid, err = manager.provider.SessionToken(loginToken)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	if sid != "" && manager.provider.SessionExist(sid) {
-		return manager.provider.SessionRead(sid)
+		store, err := manager.provider.SessionRead(sid)
+		if err != nil {
+			return nil, err
+		}
+
+		cookie := &http.Cookie{
+			Name:     manager.config.CookieName,
+			Value:    url.QueryEscape(sid),
+			Path:     "/",
+			HttpOnly: !manager.config.DisableHTTPOnly,
+			Secure:   manager.isSecure(r),
+			Domain:   manager.config.Domain,
+		}
+		if manager.config.CookieLifeTime > 0 {
+			cookie.MaxAge = manager.config.CookieLifeTime
+			cookie.Expires = time.Now().Add(time.Duration(manager.config.CookieLifeTime) * time.Second)
+		}
+		if manager.config.EnableSetCookie {
+			http.SetCookie(w, cookie)
+		}
+
+		return store, nil
 	}
 
-	// Generate a new session
-	sid, errs = manager.sessionID()
-	if errs != nil {
-		return nil, errs
-	}
-
-	session, err = manager.provider.SessionRead(sid)
-	if err != nil {
-		return nil, err
-	}
-	cookie := &http.Cookie{
-		Name:     manager.config.CookieName,
-		Value:    url.QueryEscape(sid),
-		Path:     "/",
-		HttpOnly: !manager.config.DisableHTTPOnly,
-		Secure:   manager.isSecure(r),
-		Domain:   manager.config.Domain,
-	}
-	if manager.config.CookieLifeTime > 0 {
-		cookie.MaxAge = manager.config.CookieLifeTime
-		cookie.Expires = time.Now().Add(time.Duration(manager.config.CookieLifeTime) * time.Second)
-	}
-	if manager.config.EnableSetCookie {
-		http.SetCookie(w, cookie)
-	}
-	r.AddCookie(cookie)
-
-	if manager.config.EnableSidInHTTPHeader {
-		r.Header.Set(manager.config.SessionNameInHTTPHeader, sid)
-		w.Header().Set(manager.config.SessionNameInHTTPHeader, sid)
-	}
-
-	return
+	return nil, errors.New("not found login session")
 }
 
 // SessionDestroy Destroy session by its id in http request cookie.

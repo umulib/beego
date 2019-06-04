@@ -544,6 +544,15 @@ func NewOrm() Ormer {
 	return o
 }
 
+// added by wenbo@umu.com
+func NewOrmWithAlias(aliasName string) (Ormer, error) {
+	BootStrap() // execute only once
+
+	o := new(orm)
+	err := o.Using(aliasName)
+	return o, err
+}
+
 // NewOrmWithDB create a new ormer object with specify *sql.DB for query
 func NewOrmWithDB(driverName, aliasName string, db *sql.DB) (Ormer, error) {
 	var al *alias

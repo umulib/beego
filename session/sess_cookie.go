@@ -173,6 +173,10 @@ func (pder *CookieProvider) SessionUpdate(sid string) error {
 	return nil
 }
 
-func init() {
-	Register("cookie", cookiepder)
+func (pder *CookieProvider) SessionToken(sid string) (string, error) {
+	return "", nil
 }
+
+//func init() {
+//	Register("cookie", cookiepder)
+//}
