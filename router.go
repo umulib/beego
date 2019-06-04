@@ -937,7 +937,7 @@ NOTLOGIN:
 	if statusCode == 0 {
 		statusCode = 200
 	}
-	logAccess(context, &startTime, statusCode)
+	LogAccess(context, &startTime, statusCode)
 	timeDur = time.Since(startTime)
 	context.ResponseWriter.Elapsed = timeDur
 	data := map[string]interface{}{
