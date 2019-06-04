@@ -946,7 +946,6 @@ NOTLOGIN:
 	}
 	context.Output.JSON(data, false, false)
 }
-}
 
 func (p *ControllerRegister) handleParamResponse(context *beecontext.Context, execController ControllerInterface, results []reflect.Value) {
 	//looping in reverse order for the case when both error and value are returned and error sets the response status code
