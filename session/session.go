@@ -38,6 +38,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -225,6 +226,9 @@ func (manager *Manager) getLoginToken(r *http.Request) (loginToken string, err e
 // if session id exists, return SessionStore with this id.
 // modify by wenbo@umu.com
 func (manager *Manager) SessionStart(w http.ResponseWriter, r *http.Request) (session Store, err error) {
+	if strings.HasPrefix(r.URL.Path, "/internalApi") {
+		return nil, nil
+	}
 	sid, errs := manager.getSid(r)
 	if errs != nil {
 		return nil, errs
