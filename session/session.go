@@ -259,23 +259,25 @@ func (manager *Manager) SessionStart(w http.ResponseWriter, r *http.Request) (se
 			return nil, err
 		}
 
-		//cookie := &http.Cookie{
-		//	Name:     manager.config.CookieName,
-		//	Value:    url.QueryEscape(sid),
-		//	Path:     "/",
-		//	HttpOnly: !manager.config.DisableHTTPOnly,
-		//	Secure:   manager.isSecure(r),
-		//	Domain:   manager.config.Domain,
-		//}
-		//if manager.config.CookieLifeTime > 0 {
-		//	cookie.MaxAge = manager.config.CookieLifeTime
-		//	cookie.Expires = time.Now().Add(time.Duration(manager.config.CookieLifeTime) * time.Second)
-		//}
-		//if manager.config.EnableSetCookie {
-		//	http.SetCookie(w, cookie)
-		//}
+		cookie := &http.Cookie{
+			Name:     manager.config.CookieName,
+			Value:    url.QueryEscape(sid),
+			Path:     "/",
+			HttpOnly: !manager.config.DisableHTTPOnly,
+			Secure:   manager.isSecure(r),
+			Domain:   manager.config.Domain,
+		}
+		if manager.config.CookieLifeTime > 0 {
+			cookie.MaxAge = manager.config.CookieLifeTime
+			cookie.Expires = time.Now().Add(time.Duration(manager.config.CookieLifeTime) * time.Second)
+		}
+		if manager.config.EnableSetCookie {
+			http.SetCookie(w, cookie)
+		}
 
-		return store, nil
+		if store != nil {
+			return store, nil
+		}
 	}
 
 	store, err = manager.provider.AfterGetSid(r)
