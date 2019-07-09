@@ -38,7 +38,6 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -63,6 +62,8 @@ type Provider interface {
 	SessionAll() int //get all active session
 	SessionGC()
 	SessionToken(token string) (string, error)
+	BeforeGetSid(r *http.Request) (Store, error)
+	AfterGetSid(r *http.Request) (Store, error)
 }
 
 var provides = make(map[string]Provider)
@@ -226,9 +227,14 @@ func (manager *Manager) getLoginToken(r *http.Request) (loginToken string, err e
 // if session id exists, return SessionStore with this id.
 // modify by wenbo@umu.com
 func (manager *Manager) SessionStart(w http.ResponseWriter, r *http.Request) (session Store, err error) {
-	if strings.HasPrefix(r.URL.Path, "/internalApi") {
-		return nil, nil
+	store, err := manager.provider.BeforeGetSid(r)
+	if err != nil {
+		return
 	}
+	if store != nil {
+		return store, nil
+	}
+
 	sid, errs := manager.getSid(r)
 	if errs != nil {
 		return nil, errs
@@ -253,22 +259,30 @@ func (manager *Manager) SessionStart(w http.ResponseWriter, r *http.Request) (se
 			return nil, err
 		}
 
-		cookie := &http.Cookie{
-			Name:     manager.config.CookieName,
-			Value:    url.QueryEscape(sid),
-			Path:     "/",
-			HttpOnly: !manager.config.DisableHTTPOnly,
-			Secure:   manager.isSecure(r),
-			Domain:   manager.config.Domain,
-		}
-		if manager.config.CookieLifeTime > 0 {
-			cookie.MaxAge = manager.config.CookieLifeTime
-			cookie.Expires = time.Now().Add(time.Duration(manager.config.CookieLifeTime) * time.Second)
-		}
-		if manager.config.EnableSetCookie {
-			http.SetCookie(w, cookie)
-		}
+		//cookie := &http.Cookie{
+		//	Name:     manager.config.CookieName,
+		//	Value:    url.QueryEscape(sid),
+		//	Path:     "/",
+		//	HttpOnly: !manager.config.DisableHTTPOnly,
+		//	Secure:   manager.isSecure(r),
+		//	Domain:   manager.config.Domain,
+		//}
+		//if manager.config.CookieLifeTime > 0 {
+		//	cookie.MaxAge = manager.config.CookieLifeTime
+		//	cookie.Expires = time.Now().Add(time.Duration(manager.config.CookieLifeTime) * time.Second)
+		//}
+		//if manager.config.EnableSetCookie {
+		//	http.SetCookie(w, cookie)
+		//}
 
+		return store, nil
+	}
+
+	store, err = manager.provider.AfterGetSid(r)
+	if err != nil {
+		return
+	}
+	if store != nil {
 		return store, nil
 	}
 
