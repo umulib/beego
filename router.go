@@ -719,7 +719,7 @@ func (p *ControllerRegister) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 		var err error
 		context.Input.CruSession, err = GlobalSessions.SessionStart(rw, r)
 		if err != nil {
-			//logs.Error(err)
+			logs.Error(err)
 			//exception("503", context)
 			//goto Admin
 			goto NOTLOGIN
