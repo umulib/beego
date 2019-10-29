@@ -403,6 +403,16 @@ func parseFormToStruct(form url.Values, objT reflect.Type, objV reflect.Value) e
 					fieldV.Index(i).SetString(formVals[i])
 				}
 			}
+		case reflect.Ptr:
+			switch fieldT.Type.String() {
+			case "*uint32":
+				i, err := strconv.ParseInt(value, 10, 64)
+				if err != nil {
+					return err
+				}
+				v := uint32(i)
+				fieldV.Addr().Elem().Set(reflect.ValueOf(&v))
+			}
 		}
 	}
 	return nil
